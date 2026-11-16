@@ -33,6 +33,13 @@ export interface WalletUtxo extends Outpoint, AddressPath {
   token?: TokenData;
 }
 
+export interface InventorySnapshot {
+  utxos: WalletUtxo[];
+  scannedAddresses: number;
+  truncated: boolean;
+  checkedAt: number;
+}
+
 export interface NftAsset extends Outpoint {
   category: string;
   commitment: string;
