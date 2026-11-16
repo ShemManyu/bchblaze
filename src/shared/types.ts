@@ -89,6 +89,7 @@ export interface ProposalParticipant {
 }
 
 export interface SwapProposal {
+  circleId: string;
   network: Network;
   unsignedTransaction: string;
   sourceOutputs: SerializedOutput[];
