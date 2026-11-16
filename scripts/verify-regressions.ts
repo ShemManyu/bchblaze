@@ -78,6 +78,15 @@ const mutations: Mutation[] = [
       'does not record an approval arriving after the coordination window',
   },
   {
+    name: 'untyped external wallet rejection',
+    file: 'src/web/wallet.ts',
+    pattern:
+      /catch \{\s*signal\?\.throwIfAborted\(\);\s*throw new DomainError\(\s*'WALLET_REJECTED',[\s\S]*?\n {2}\}/,
+    replacement: 'catch (error) { throw error; }',
+    testFile: 'tests/wizardconnect.test.ts',
+    testName: 'signs distinct HD inputs in three external wallet managers',
+  },
+  {
     name: 'stale broadcast results replacing newer confirmations',
     file: 'src/server/store.ts',
     pattern:

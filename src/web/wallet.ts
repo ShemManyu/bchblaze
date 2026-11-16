@@ -155,10 +155,19 @@ export async function signSwap(
     'Use the browser with your original saved offer.',
   );
   const participant = assertWalletOwnsInputs(manager, proposal, offer);
-  const response = await manager.signTransaction(
-    signingRequest(proposal, participant),
-    { signal },
-  );
+  let response: Awaited<ReturnType<DappConnectionManager['signTransaction']>>;
+  try {
+    response = await manager.signTransaction(
+      signingRequest(proposal, participant),
+      { signal },
+    );
+  } catch {
+    signal?.throwIfAborted();
+    throw new DomainError(
+      'WALLET_REJECTED',
+      'The wallet declined or could not sign with the required flags. No new approval was submitted.',
+    );
+  }
   signal?.throwIfAborted();
   if (response.error || !response.signedTransaction) {
     throw new DomainError(

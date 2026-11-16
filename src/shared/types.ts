@@ -1,6 +1,12 @@
 export type Network = 'chipnet' | 'mainnet';
 export type PathName = 'receive' | 'change' | 'defi';
 
+export interface PublicConfig {
+  relayUrls: string[];
+  prizeAddress: string;
+  mode: 'live' | 'local-demo';
+}
+
 export interface AddressPath {
   address: string;
   path: PathName;

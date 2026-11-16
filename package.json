@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "NODE_ENV=development node --env-file-if-exists=.env --import tsx --watch src/server/index.ts",
     "start": "NODE_ENV=production node --env-file-if-exists=.env dist/server/server/index.js",
+    "demo": "npm run build && node --import tsx e2e/server.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
@@ -17,7 +18,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:regressions": "node --import tsx scripts/verify-regressions.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {

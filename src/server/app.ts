@@ -57,6 +57,8 @@ export interface AppOptions {
   publicOrigin?: string;
   development?: boolean;
   relayUrls?: string[];
+  prizeAddress?: string;
+  localDemo?: boolean;
 }
 
 export function createApplication(
@@ -92,6 +94,14 @@ export function createApplication(
   });
   app.get('/api/health', (_request, response) => {
     response.json({ name: 'SwapCircle', version: '0.1.0', status: 'ok' });
+  });
+  app.get('/api/config', (_request, response) => {
+    response.setHeader('Cache-Control', 'no-store');
+    response.json({
+      relayUrls: options.relayUrls ?? [],
+      prizeAddress: options.prizeAddress ?? '',
+      mode: options.localDemo ? 'local-demo' : 'live',
+    });
   });
 
   app.use('/api', (request, response, next) => {

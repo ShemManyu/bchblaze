@@ -1,29 +1,31 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowUpRight, CircleDashed } from 'lucide-react';
+import { App } from './App.js';
+import type { PublicConfig } from '../shared/types.js';
 import './styles.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <main className="foundation">
-      <span className="brand">
-        <CircleDashed size={28} /> SwapCircle
-      </span>
-      <p className="eyebrow">BITCOIN CASH / CASHTOKENS</p>
-      <h1>
-        Three collectors.
-        <br />
-        One circle.
-      </h1>
-      <p>
-        A wants B's token. B wants C's. C wants A's.
-        <br />
-        Close the loop in one noncustodial transaction.
-      </p>
-      <a href="https://github.com/ShemManyu/bchblaze">
-        Follow the build <ArrowUpRight size={16} />
-      </a>
-      <small>Protocol foundation. Trading workflow is being implemented.</small>
-    </main>
-  </StrictMode>,
-);
+const root = createRoot(document.getElementById('root')!);
+try {
+  const response = await fetch('/api/config');
+  if (!response.ok) throw new Error('Coordinator unavailable.');
+  const config = (await response.json()) as PublicConfig;
+  root.render(
+    <StrictMode>
+      <App config={config} />
+    </StrictMode>,
+  );
+} catch {
+  root.render(
+    <main className="startup-error">
+      <h1>The coordinator is unavailable.</h1>
+      <p>Your spending keys stay with your wallet.</p>
+      <button
+        type="button"
+        className="button button-primary"
+        onClick={() => location.reload()}
+      >
+        Reload SwapCircle
+      </button>
+    </main>,
+  );
+}

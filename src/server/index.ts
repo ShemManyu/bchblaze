@@ -16,6 +16,7 @@ const coordinator = new Coordinator(store, chain);
 const app = createApplication(coordinator, {
   development: process.env.NODE_ENV !== 'production',
   publicOrigin: process.env.PUBLIC_ORIGIN,
+  prizeAddress: process.env.VITE_PRIZE_ADDRESS,
   relayUrls: process.env.VITE_WIZARD_RELAYS?.split(',')
     .map((url) => url.trim())
     .filter(Boolean),

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SwapCircle | Local test wallets</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        color: #dce8d1;
+        background: #101510;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        max-width: 880px;
+        padding: 28px 20px;
+        margin: auto;
+      }
+      h1 {
+        font-size: 32px;
+        letter-spacing: -1px;
+      }
+      h2 {
+        font-size: 19px;
+        margin-bottom: 8px;
+      }
+      p,
+      li {
+        color: #a4b497;
+        font-size: 13px;
+        line-height: 1.8;
+      }
+      strong,
+      a {
+        color: #bcf171;
+      }
+      header {
+        border-bottom: 1px solid #3b5030;
+        padding-bottom: 20px;
+      }
+      .badge {
+        font-size: 10px;
+        letter-spacing: 2px;
+        color: #e6ca82;
+      }
+      #actors {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin: 28px 0;
+      }
+      article,
+      form {
+        border: 1px solid #3b5030;
+        border-radius: 12px;
+        padding: 20px;
+        background: #1b2517;
+        min-width: 0;
+      }
+      article p {
+        font-size: 10px;
+      }
+      code {
+        display: block;
+        overflow-wrap: anywhere;
+        color: #b7cf9f;
+        font-size: 10px;
+        line-height: 1.8;
+      }
+      label {
+        display: block;
+        color: #bdd3ab;
+        font-size: 12px;
+        margin-bottom: 18px;
+      }
+      select,
+      textarea {
+        display: block;
+        width: 100%;
+        margin-top: 9px;
+        color: #d5e9c2;
+        background: #101510;
+        border: 1px solid #4d683c;
+        border-radius: 6px;
+        padding: 11px;
+        font: 12px monospace;
+      }
+      textarea {
+        min-height: 105px;
+        resize: vertical;
+      }
+      button {
+        padding: 12px 19px;
+        font:
+          600 12px system-ui,
+          sans-serif;
+        border-radius: 7px;
+        color: #15200f;
+        background: #bcf171;
+        border: 0;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      #status {
+        color: #bcf171;
+        min-height: 24px;
+      }
+      :focus-visible {
+        outline: 2px solid #bcf171;
+        outline-offset: 4px;
+      }
+    </style>
+    <script type="module" src="/__demo/client.js"></script>
+  </head>
+  <body>
+    <header>
+      <span class="badge">LOCAL DEMO / EPHEMERAL TEST ASSETS</span>
+      <h1>Three external test wallets.</h1>
+      <p>
+        These Node-hosted wallets sign actual BCH transactions over an encrypted
+        local WizardConnect relay. The local ledger verifies BCH consensus
+        scripts. Assets are synthetic, are not minted on Chipnet or Mainnet, and
+        have no value. Restarting resets everything.
+      </p>
+      <a href="/" target="_blank" rel="noreferrer">Open SwapCircle</a>
+    </header>
+    <ol>
+      <li>
+        Open SwapCircle in three separate browser profiles, or use one browser
+        and switch wallets between approvals. Private windows may share a
+        session with each other.
+      </li>
+      <li>
+        Click <strong>Connect wallet</strong> in the app, then
+        <strong>Copy</strong> beside the pairing URI. Paste it below and choose
+        Alice, Bob, or Carol. No wallet app or real keys are needed.
+      </li>
+      <li>
+        Post Alice's NFT for Bob's category, Bob's for Carol's, and Carol's for
+        Alice's. Every commitment is <strong>01</strong>. The cards below
+        contain their public category IDs.
+      </li>
+      <li>
+        Build a matching circle, invite the other collectors, approve each exact
+        trade, and settle. Test wallets automatically sign review requests, so
+        use them only for this local demo.
+      </li>
+    </ol>
+    <div id="actors" aria-label="Public test assets"></div>
+    <form id="pair">
+      <h2>Pair an external test wallet</h2>
+      <label
+        >Test wallet<select name="actor" aria-label="Test wallet">
+          <option value="0">Alice</option>
+          <option value="1">Bob</option>
+          <option value="2">Carol</option>
+        </select></label
+      >
+      <label
+        >Pairing URI<textarea
+          name="uri"
+          aria-label="Pairing URI"
+          required
+          spellcheck="false"
+          placeholder="Paste the wiz: pairing link from SwapCircle"
+        ></textarea>
+      </label>
+      <button type="submit">Pair test wallet</button>
+      <p id="status" role="status"></p>
+    </form>
+  </body>
+</html>

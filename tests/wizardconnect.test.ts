@@ -99,6 +99,16 @@ describe('actual WizardConnect encrypted wallet protocol', () => {
           (event) => !event.content.includes(actors[0].nft.token!.category),
         ),
       ).toBe(true);
+      hosts[0]!.adapter.rejectNext = true;
+      await expect(
+        signSwap(
+          managers[0]!,
+          proposal,
+          actors.map((actor) => actor.offer),
+          actors[0].offer.id,
+        ),
+      ).rejects.toMatchObject({ code: 'WALLET_REJECTED' });
+      expect(hosts[0]!.adapter.requests).toHaveLength(2);
 
       const redirectedActors = actors.map((actor, index) => ({
         ...actor,
@@ -117,7 +127,7 @@ describe('actual WizardConnect encrypted wallet protocol', () => {
           actors[0].offer.id,
         ),
       ).rejects.toMatchObject({ code: 'OFFER_MISMATCH' });
-      expect(hosts[0]!.adapter.requests).toHaveLength(1);
+      expect(hosts[0]!.adapter.requests).toHaveLength(2);
     } finally {
       for (const host of hosts) host.manager.disconnectAll();
       await relay.waitForClients(managers.length);
