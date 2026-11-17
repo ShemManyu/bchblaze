@@ -13,6 +13,9 @@ const child = spawn(process.execPath, ['dist/server/server/index.js'], {
     PORT: '0',
     DATA_DIR: directory,
     PUBLIC_ORIGIN: '',
+    ENABLED_NETWORKS: 'chipnet',
+    SQLITE_JOURNAL_MODE: 'delete',
+    TRUST_PROXY_HOPS: '0',
     VITE_PRIZE_ADDRESS: '',
     VITE_WIZARD_RELAYS: 'wss://relay.riften.net',
   },
@@ -61,6 +64,7 @@ try {
   const config = await get('/api/config');
   assert.equal(config.headers.get('cache-control'), 'no-store');
   assert.deepEqual(await config.json(), {
+    enabledNetworks: ['chipnet'],
     relayUrls: ['wss://relay.riften.net'],
     prizeAddress: '',
     mode: 'live',
@@ -109,7 +113,7 @@ try {
   const force = setTimeout(() => child.kill('SIGKILL'), 7_000);
   const code = await closed;
   clearTimeout(force);
-  for (const suffix of ['', '-wal', '-shm'])
+  for (const suffix of ['', '-wal', '-shm', '-journal'])
     await rm(resolve(directory, `swapcircle.sqlite${suffix}`), { force: true });
   await rmdir(directory);
   assert.equal(code, 0, `Production shutdown failed: ${output}`);

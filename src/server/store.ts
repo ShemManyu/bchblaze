@@ -69,16 +69,19 @@ export class Store {
   constructor(
     path = ':memory:',
     public readonly now: () => number = Date.now,
+    journalMode: 'wal' | 'delete' = 'wal',
   ) {
+    if (journalMode !== 'wal' && journalMode !== 'delete')
+      throw new Error('Unsupported SQLite journal mode.');
     if (path !== ':memory:')
       mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(path);
     if (path !== ':memory:') chmodSync(path, 0o600);
     // One coordinator owns the file, including crash recovery of broadcast state.
     this.db.exec(`
-      PRAGMA journal_mode=WAL;
       PRAGMA locking_mode=EXCLUSIVE;
       PRAGMA busy_timeout=1000;
+      PRAGMA journal_mode=${journalMode.toUpperCase()};
       PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL

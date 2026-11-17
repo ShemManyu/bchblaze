@@ -74,6 +74,9 @@ const sameWanted = (a: WantedAsset, b: WantedAsset) =>
       outpointKey(a.outpoint) === outpointKey(b.outpoint)));
 
 export function App({ config }: { config: PublicConfig }) {
+  const enabledNetworks =
+    config.enabledNetworks ??
+    (config.mode === 'local-demo' ? ['chipnet', 'mainnet'] : ['chipnet']);
   const [network, setNetwork] = useState<Network>('chipnet');
   const [mainnetConfirmed, setMainnetConfirmed] = useState(false);
   const [mainnetDialog, setMainnetDialog] = useState(false);
@@ -286,6 +289,7 @@ export function App({ config }: { config: PublicConfig }) {
   }
   async function changeNetwork(next: Network) {
     if (busy) return;
+    if (!enabledNetworks.includes(next)) return;
     if (next === 'mainnet') {
       setMainnetCheckbox(false);
       setMainnetDialog(true);
@@ -554,7 +558,14 @@ export function App({ config }: { config: PublicConfig }) {
                 }}
               >
                 <option value="chipnet">Chipnet</option>
-                <option value="mainnet">Mainnet</option>
+                <option
+                  value="mainnet"
+                  disabled={!enabledNetworks.includes('mainnet')}
+                >
+                  {enabledNetworks.includes('mainnet')
+                    ? 'Mainnet'
+                    : 'Mainnet (disabled)'}
+                </option>
               </select>
               <ChevronDown size={12} />
             </label>

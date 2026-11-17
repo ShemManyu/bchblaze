@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -17,12 +17,16 @@ afterEach(() => {
   for (const store of stores) store.close();
   stores.clear();
   for (const file of files.splice(0)) {
-    for (const suffix of ['', '-wal', '-shm'])
+    for (const suffix of ['', '-wal', '-shm', '-journal'])
       rmSync(file + suffix, { force: true });
   }
 });
 
-async function fixture(extraNft = false, persistent = false) {
+async function fixture(
+  extraNft = false,
+  persistent = false,
+  journalMode: 'wal' | 'delete' = 'wal',
+) {
   const actors = testActors();
   const chain = new FixtureChain();
   chain.addActors(actors, extraNft);
@@ -31,7 +35,7 @@ async function fixture(extraNft = false, persistent = false) {
     ? join(tmpdir(), `swapcircle-${randomUUID()}.sqlite`)
     : ':memory:';
   if (persistent) files.push(path);
-  const store = new Store(path, () => now);
+  const store = new Store(path, () => now, journalMode);
   stores.add(store);
   const coordinator = new Coordinator(store, chain);
   const sessions = ['collector-a', 'collector-b', 'collector-c'];
@@ -88,6 +92,34 @@ async function fixture(extraNft = false, persistent = false) {
 }
 
 describe('persistent non-custodial coordinator', () => {
+  it('enforces the configured networks for existing room approvals and settlement', async () => {
+    const f = await fixture();
+    const circle = await f.prepare();
+    const restricted = new Coordinator(f.store, f.chain, ['mainnet']);
+    await expect(
+      restricted.createOffer(f.sessions[0]!, f.requests[0]!),
+    ).rejects.toMatchObject({ code: 'NETWORK_DISABLED' });
+    await expect(
+      restricted.prepare(
+        f.actors.map((actor) => actor.offer.id),
+        f.sessions[0]!,
+      ),
+    ).rejects.toMatchObject({ code: 'NETWORK_DISABLED' });
+    await expect(
+      restricted.approve(
+        circle.id,
+        f.sessions[0]!,
+        f.actors[0].offer.id,
+        circle.proposal!.fingerprint,
+        signActor(circle.proposal!, f.actors[0]),
+      ),
+    ).rejects.toMatchObject({ code: 'NETWORK_DISABLED' });
+    for (const index of [0, 1, 2]) await f.approve(circle, index);
+    await expect(
+      restricted.settle(circle.id, f.sessions[0]!),
+    ).rejects.toMatchObject({ code: 'NETWORK_DISABLED' });
+    expect(f.chain.broadcasts).toHaveLength(0);
+  });
   it('moves actual ledger NFTs and BCH change only after all three signatures', async () => {
     const f = await fixture();
     let circle = await f.prepare();
@@ -389,50 +421,57 @@ describe('persistent non-custodial coordinator', () => {
     expect(f.store.isReserved('chipnet', f.actors[0].nft)).toBe(true);
   });
 
-  it('persists sessions, immutable proposals, and partial approvals across restart', async () => {
-    const f = await fixture(false, true);
-    const circle = await f.prepare();
-    await f.approve(circle, 0);
-    f.store.close();
-    stores.delete(f.store);
-    const reopened = new Store(f.path, f.now);
-    stores.add(reopened);
-    const coordinator = new Coordinator(reopened, f.chain);
-    const restored = coordinator.circle(circle.id, f.sessions[0]!);
-    expect(reopened.hasSession(f.sessions[0]!)).toBe(true);
-    expect(restored.proposal!.fingerprint).toBe(circle.proposal!.fingerprint);
-    expect(
-      restored.participants.filter((participant) => participant.signed),
-    ).toHaveLength(1);
-    for (const index of [1, 2]) {
-      await coordinator.approve(
-        circle.id,
-        f.sessions[index]!,
-        f.actors[index]!.offer.id,
-        circle.proposal!.fingerprint,
-        signActor(circle.proposal!, f.actors[index]!),
+  it.each(['wal', 'delete'] as const)(
+    'persists sessions, immutable proposals, and partial approvals across restart (%s)',
+    async (journalMode) => {
+      const f = await fixture(false, true, journalMode);
+      const circle = await f.prepare();
+      await f.approve(circle, 0);
+      expect(existsSync(f.path + '-wal')).toBe(journalMode === 'wal');
+      f.store.close();
+      stores.delete(f.store);
+      const reopened = new Store(f.path, f.now, journalMode);
+      stores.add(reopened);
+      const coordinator = new Coordinator(reopened, f.chain);
+      const restored = coordinator.circle(circle.id, f.sessions[0]!);
+      expect(reopened.hasSession(f.sessions[0]!)).toBe(true);
+      expect(restored.proposal!.fingerprint).toBe(circle.proposal!.fingerprint);
+      expect(
+        restored.participants.filter((participant) => participant.signed),
+      ).toHaveLength(1);
+      for (const index of [1, 2]) {
+        await coordinator.approve(
+          circle.id,
+          f.sessions[index]!,
+          f.actors[index]!.offer.id,
+          circle.proposal!.fingerprint,
+          signActor(circle.proposal!, f.actors[index]!),
+        );
+      }
+      expect((await coordinator.settle(circle.id, f.sessions[0]!)).status).toBe(
+        'broadcast',
       );
-    }
-    expect((await coordinator.settle(circle.id, f.sessions[0]!)).status).toBe(
-      'broadcast',
-    );
-  });
+    },
+  );
 
-  it('recovers an interrupted broadcast as unknown and preserves its identical transaction', async () => {
-    const f = await fixture(false, true);
-    const circle = await f.ready();
-    const original = f.store.getCircle(circle.id).signedTransaction!;
-    f.store.beginBroadcast(circle.id);
-    f.store.close();
-    stores.delete(f.store);
-    const reopened = new Store(f.path, f.now);
-    stores.add(reopened);
-    const coordinator = new Coordinator(reopened, f.chain);
-    expect(coordinator.circle(circle.id, f.sessions[0]!).status).toBe(
-      'broadcast_unknown',
-    );
-    expect(reopened.getCircle(circle.id).signedTransaction).toBe(original);
-    await coordinator.settle(circle.id, f.sessions[0]!);
-    expect(f.chain.broadcasts).toEqual([original]);
-  });
+  it.each(['wal', 'delete'] as const)(
+    'recovers an interrupted broadcast as unknown and preserves its identical transaction (%s)',
+    async (journalMode) => {
+      const f = await fixture(false, true, journalMode);
+      const circle = await f.ready();
+      const original = f.store.getCircle(circle.id).signedTransaction!;
+      f.store.beginBroadcast(circle.id);
+      f.store.close();
+      stores.delete(f.store);
+      const reopened = new Store(f.path, f.now, journalMode);
+      stores.add(reopened);
+      const coordinator = new Coordinator(reopened, f.chain);
+      expect(coordinator.circle(circle.id, f.sessions[0]!).status).toBe(
+        'broadcast_unknown',
+      );
+      expect(reopened.getCircle(circle.id).signedTransaction).toBe(original);
+      await coordinator.settle(circle.id, f.sessions[0]!);
+      expect(f.chain.broadcasts).toEqual([original]);
+    },
+  );
 });

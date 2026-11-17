@@ -12,6 +12,7 @@
     "start": "NODE_ENV=production node --env-file-if-exists=.env dist/server/server/index.js",
     "demo": "npm run build && node --import tsx e2e/server.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
+    "package:azure": "npm run build && node --import tsx scripts/package-azure.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",

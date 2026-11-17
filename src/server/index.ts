@@ -1,21 +1,42 @@
 import express from 'express';
 import { resolve } from 'node:path';
+import { z } from 'zod';
 import { createApplication } from './app.js';
 import { ElectrumChain } from './chain.js';
 import { Coordinator } from './coordinator.js';
 import { Store } from './store.js';
 
+const enabledNetworks = z
+  .array(z.enum(['chipnet', 'mainnet']))
+  .nonempty()
+  .parse(
+    (process.env.ENABLED_NETWORKS ?? 'chipnet')
+      .split(',')
+      .map((value) => value.trim()),
+  );
+const journalMode = z
+  .enum(['wal', 'delete'])
+  .parse(process.env.SQLITE_JOURNAL_MODE ?? 'wal');
+const trustProxyHops = z.coerce
+  .number()
+  .int()
+  .min(0)
+  .max(5)
+  .parse(process.env.TRUST_PROXY_HOPS ?? 0);
 const store = new Store(
   resolve(process.env.DATA_DIR ?? './data', 'swapcircle.sqlite'),
+  Date.now,
+  journalMode,
 );
 const chain = new ElectrumChain({
   chipnet: process.env.CHIPNET_ELECTRUM_HOST,
   mainnet: process.env.MAINNET_ELECTRUM_HOST,
 });
-const coordinator = new Coordinator(store, chain);
+const coordinator = new Coordinator(store, chain, enabledNetworks);
 const app = createApplication(coordinator, {
   development: process.env.NODE_ENV !== 'production',
   publicOrigin: process.env.PUBLIC_ORIGIN,
+  trustProxyHops,
   prizeAddress: process.env.VITE_PRIZE_ADDRESS,
   relayUrls: process.env.VITE_WIZARD_RELAYS?.split(',')
     .map((url) => url.trim())

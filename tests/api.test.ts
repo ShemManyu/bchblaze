@@ -1,11 +1,16 @@
 import type { Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createApplication } from '../src/server/app.js';
+import { createApplication, type AppOptions } from '../src/server/app.js';
 import { Coordinator } from '../src/server/coordinator.js';
 import { Store } from '../src/server/store.js';
 import { signActor, testActors } from './fixtures/actors.js';
 import { FixtureChain } from './fixtures/chain.js';
-import type { Circle, CreateOffer, Offer } from '../src/shared/types.js';
+import type {
+  Circle,
+  CreateOffer,
+  Network,
+  Offer,
+} from '../src/shared/types.js';
 
 const servers: Server[] = [];
 const stores: Store[] = [];
@@ -17,13 +22,19 @@ afterEach(async () => {
   for (const store of stores.splice(0)) store.close();
 });
 
-async function fixture() {
+async function fixture(
+  options: AppOptions = {},
+  networks: readonly Network[] = ['chipnet', 'mainnet'],
+) {
   const actors = testActors();
   const chain = new FixtureChain();
   chain.addActors(actors);
   const store = new Store();
   stores.push(store);
-  const app = createApplication(new Coordinator(store, chain));
+  const app = createApplication(
+    new Coordinator(store, chain, networks),
+    options,
+  );
   const server = app.listen(0, '127.0.0.1');
   servers.push(server);
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -159,4 +170,61 @@ describe('trading HTTP API', () => {
     ).toBe('MAINNET_CONFIRMATION_REQUIRED');
     expect(f.store.listOffers('mainnet')).toHaveLength(0);
   });
+
+  it('cannot enable Mainnet with a forged acknowledgement when the server is Chipnet-only', async () => {
+    const f = await fixture({}, ['chipnet']);
+    const config = await f.clients[0]!.request('/api/config');
+    expect(
+      ((await config.json()) as { enabledNetworks: Network[] }).enabledNetworks,
+    ).toEqual(['chipnet']);
+    const response = await f.clients[0]!.request(
+      '/api/offers',
+      {
+        ...f.requests[0],
+        network: 'mainnet',
+      },
+      { 'x-swapcircle-mainnet': 'approved' },
+    );
+    expect(response.status).toBe(403);
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code,
+    ).toBe('NETWORK_DISABLED');
+    expect(f.store.listOffers('mainnet')).toHaveLength(0);
+  });
+
+  it.each([0, 1])(
+    'trusts forwarded client addresses only with an explicit proxy-hop configuration (%i)',
+    async (hops) => {
+      for (const address of ['198.51.100.1', '[2001:db8::1]']) {
+        const f = await fixture({ trustProxyHops: hops });
+        for (let index = 0; index < 240; index += 1) {
+          const response = await f.clients[0]!.request(
+            '/api/market',
+            undefined,
+            {
+              'x-forwarded-for': `${address}:${10000 + index}`,
+            },
+          );
+          expect(response.status).toBe(200);
+          await response.text();
+        }
+        const sameClient = await f.clients[0]!.request(
+          '/api/market',
+          undefined,
+          {
+            'x-forwarded-for': `${address}:30000`,
+          },
+        );
+        expect(sameClient.status).toBe(429);
+        const differentClient = await f.clients[0]!.request(
+          '/api/market',
+          undefined,
+          {
+            'x-forwarded-for': '198.51.100.2:40000',
+          },
+        );
+        expect(differentClient.status).toBe(hops ? 200 : 429);
+      }
+    },
+  );
 });

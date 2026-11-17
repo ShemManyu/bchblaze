@@ -84,9 +84,10 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. Chipnet is the default. Mainnet requires a fresh,
-explicit risk acknowledgement and wallet reconnection. No keys are created or
-requested by the production application.
+Open `http://127.0.0.1:5173`. Chipnet is the default and only enabled network.
+An operator must explicitly set `ENABLED_NETWORKS=chipnet,mainnet` to enable
+Mainnet. A fresh risk acknowledgement and wallet reconnection are still required.
+No keys are created or requested by the production application.
 
 Use three supported wallet accounts with immutable NFTs and BCH for fees. The
 default scan covers receive and change indexes 0 through 19, at most 40 addresses.
@@ -120,16 +121,19 @@ The compiled server serves both the UI and API. Do not serve the Vite output
 alone. The coordinator requires Node's built-in SQLite support. Node 22 may print
 an experimental SQLite warning.
 
-| Variable                | Purpose                                                                                                                          |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `HOST`                  | Defaults to `127.0.0.1`; use `0.0.0.0` only when intentionally exposing the service.                                             |
-| `PORT`                  | Defaults to `5173`.                                                                                                              |
-| `DATA_DIR`              | Persistent coordinator directory, default `./data`.                                                                              |
-| `PUBLIC_ORIGIN`         | Exact public HTTPS origin behind a reverse proxy, without a path. Enforces write origin and secure cookies. Leave blank locally. |
-| `CHIPNET_ELECTRUM_HOST` | Chipnet node host, default `chipnet.bch.ninja`.                                                                                  |
-| `MAINNET_ELECTRUM_HOST` | Mainnet node host, default `bch.imaginary.cash`.                                                                                 |
-| `VITE_WIZARD_RELAYS`    | Optional comma-separated relay WebSocket URLs. Blank uses WizardConnect defaults.                                                |
-| `VITE_PRIZE_ADDRESS`    | Owner-supplied Mainnet token-aware prize address, shown in the hackathon banner. Blank is visibly unconfigured.                  |
+| Variable                | Purpose                                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `HOST`                  | Defaults to `127.0.0.1`; use `0.0.0.0` only when intentionally exposing the service.                                                                               |
+| `PORT`                  | Defaults to `5173`.                                                                                                                                                |
+| `DATA_DIR`              | Persistent coordinator directory, default `./data`.                                                                                                                |
+| `PUBLIC_ORIGIN`         | Exact public HTTPS origin behind a reverse proxy, without a path. Enforces write origin and secure cookies. Leave blank locally.                                   |
+| `ENABLED_NETWORKS`      | Comma-separated networks. Defaults to `chipnet`. Disabled networks reject offer, preparation, approval, and settlement requests even with Mainnet acknowledgement. |
+| `SQLITE_JOURNAL_MODE`   | `wal` locally, or `delete` for the single-instance Azure persistent network filesystem. Invalid values stop startup.                                               |
+| `TRUST_PROXY_HOPS`      | Defaults to `0`, ignoring forwarded client IPs. Azure uses `1` for its trusted proxy. Do not expose the backend through a shorter or untrusted path.               |
+| `CHIPNET_ELECTRUM_HOST` | Chipnet node host, default `chipnet.bch.ninja`.                                                                                                                    |
+| `MAINNET_ELECTRUM_HOST` | Mainnet node host, default `bch.imaginary.cash`.                                                                                                                   |
+| `VITE_WIZARD_RELAYS`    | Optional comma-separated relay WebSocket URLs. Blank uses WizardConnect defaults.                                                                                  |
+| `VITE_PRIZE_ADDRESS`    | Owner-supplied Mainnet token-aware prize address, shown in the hackathon banner. Blank is visibly unconfigured.                                                    |
 
 Despite the historical `VITE_` names, the two public settings are read by the
 server at startup and delivered through `/api/config`. Restarting applies them;
@@ -146,10 +150,68 @@ recover a lost browser session.
 
 For public hosting, terminate TLS at a trusted reverse proxy, bind the backend
 privately, set `PUBLIC_ORIGIN`, and use trusted Electrum infrastructure. The
-application does not trust forwarded client-IP headers, so its 240-request/minute
-limit is shared by clients behind one proxy. Add appropriate edge rate limiting
-and capacity planning before a public community pilot. `/api/health` proves
+application ignores forwarded client-IP headers unless `TRUST_PROXY_HOPS` is
+explicitly configured for the host's trusted proxy topology. Its limit is 240
+requests/minute per resolved client IP. Add appropriate edge rate limiting and
+capacity planning before a public community pilot. `/api/health` proves
 coordinator readiness, not blockchain-node availability.
+
+### Azure Chipnet deployment
+
+Public URL: <https://swapcircle-chipnet-9d5de7f7.azurewebsites.net>
+
+Resource group `SwapCircle`, East US, one Linux B1 plan
+`swapcircle-chipnet-plan`, one Node 22 LTS app, one coordinator process.
+Mainnet is disabled server-side and in the network selector. There is no separate
+paid database, container registry, or monitoring workspace.
+
+The verified retail B1 rate is $0.017/hour, approximately $12.41 per 730-hour
+month or $12.65 per 31-day month, before tax and separately metered usage.
+A resource-group-scoped $15 monthly Azure budget notifies Owners at 80% actual
+cost and 100% forecast cost. **Budget alerts are not a hard spending cap.**
+Stopping only the app does not stop plan charges. Do not scale the plan or add
+paid services without revisiting this budget.
+
+Runtime settings use `HOST=0.0.0.0`, the Azure-provided `PORT`,
+`DATA_DIR=/home/swapcircle`, `SQLITE_JOURNAL_MODE=delete`,
+`ENABLED_NETWORKS=chipnet`, `TRUST_PROXY_HOPS=1`, and the exact HTTPS
+`PUBLIC_ORIGIN` above. `/home/swapcircle` is persistent storage, not the
+deployment directory. Single-process exclusive database ownership is required;
+do not add instances or clustered workers. Keep `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true`.
+Persistent hosting storage is not a backup. Stop the app before a file-copy
+backup and keep that backup separately.
+
+Build a runtime-only deployment archive locally:
+
+```sh
+npm run check
+npm run package:azure
+```
+
+`data/swapcircle-azure.zip` contains only `dist/` and production dependency
+manifests. Azure Oryx installs the locked production dependencies for Linux;
+macOS `node_modules`, `.env`, databases, test wallets, and demo controls are not
+uploaded. There is no remote TypeScript/Vite build or development dependency
+installation. The app uses `SCM_DO_BUILD_DURING_DEPLOYMENT=true`,
+`ENABLE_ORYX_BUILD=true`, `NODE_ENV=production`, and startup command `npm start`.
+
+For subsequent releases, stop the app before deploying to avoid overlapping
+SQLite owners. The following commands intentionally cause brief downtime:
+
+```sh
+az webapp stop --name swapcircle-chipnet-9d5de7f7 --resource-group SwapCircle \
+  --subscription 9d5de7f7-5e9e-4441-9ff9-ebe7c7030d86
+az webapp deploy --name swapcircle-chipnet-9d5de7f7 --resource-group SwapCircle \
+  --subscription 9d5de7f7-5e9e-4441-9ff9-ebe7c7030d86 \
+  --src-path data/swapcircle-azure.zip --type zip --clean true --track-status false
+az webapp start --name swapcircle-chipnet-9d5de7f7 --resource-group SwapCircle \
+  --subscription 9d5de7f7-5e9e-4441-9ff9-ebe7c7030d86
+```
+
+Check HTTPS readiness at `/api/health`, operator restrictions at `/api/config`,
+and live Electrum connectivity at `/api/network/chipnet`. A healthy hosted app
+does not establish funded Chipnet settlement or compatibility with a released
+wallet. The public marketplace starts empty, not with synthetic demo offers.
 
 ### Container
 
@@ -166,7 +228,7 @@ docker run --rm --name swapcircle \
 The image runs as a non-root user and excludes test wallets and demo controls.
 It binds `0.0.0.0` inside the container, while the example publishes only to host
 loopback. Explicit `-e` values override development values from the provided
-`.env` example. No production service has been deployed.
+`.env` example. Azure uses the native Node runtime rather than this container.
 
 ## Protocol and trust boundaries
 
@@ -210,7 +272,7 @@ seed phrase.**
 
 ```sh
 npm run check             # Format, lint, types, unit/integration tests, build, production smoke test
-npm run test:regressions  # Reintroduces nine guarded bugs and requires the focused tests to fail
+npm run test:regressions  # Reintroduces 13 guarded bugs and requires the focused tests to fail
 npm run test:e2e          # Builds and runs the real three-browser flow
 npm audit
 ```
@@ -219,9 +281,11 @@ If Playwright reports that Chromium is missing, install it with
 `npx playwright install chromium` and rerun. Set `PLAYWRIGHT_PORT` to use a
 different local test port.
 
-The 47 Vitest tests cover matching, consensus/signature rules, Electrum source
+The 53 Vitest tests cover matching, consensus/signature rules, Electrum source
 validation, persistence, API authorization, asynchronous races, expiration,
-uncertain broadcasts, reorgs, and real encrypted wallet communication. Three
+uncertain broadcasts, reorgs, server-enforced network restrictions, proxy-aware
+rate limits, and real encrypted wallet communication. Persistence and interrupted
+broadcast recovery run in both WAL and rollback-journal modes. Three
 Playwright tests cover mobile layout and Mainnet consent, altered-offer rejection,
 and the complete three-browser lifecycle, including corrupted original-offer
 protection, cancellation/repreparation, wallet rejection, the third-signature
@@ -233,6 +297,11 @@ Screenshots and failed-run traces are written to ignored `test-results/`.
 The same commands can be used in CI; install Chromium with
 `npx playwright install --with-deps chromium` on a fresh Linux runner. Automated
 tests use ephemeral local assets and do not spend real funds.
+
+At deployment time, the production dependency audit is clean. The full
+development audit reports an upstream `picomatch` ReDoS advisory through
+Vite/Vitest/ESLint tooling. Those dependency paths are not installed in the
+runtime-only Azure package; no forced toolchain downgrade was applied.
 
 ## Repository map
 
@@ -247,13 +316,14 @@ tests use ephemeral local assets and do not spend real funds.
 
 ## BLAZE submission gates, owned by the repository owner
 
-- Choose a source license and make the repository public when ready. It is
-  intentionally still private and marked `UNLICENSED`.
+- Choose a source license. The repository is public; its source remains
+  `UNLICENSED` until the owner selects a license.
 - Configure and independently verify the token-aware prize address.
 - Complete the wallet-specific funded Chipnet pilot and a small Mainnet
   acceptance test. A working Mainnet submission is not established by the local
   fixture demo.
-- Deploy the application on HTTPS after reviewing the operational limits.
+- Review the hosted Chipnet deployment's operational limits before a community
+  pilot. Hosting does not complete the funded-wallet acceptance gate.
 - Record the working three-collector demo and link the presentation and public
   repository. Disclose pre-event work where required by the event rules.
 - This build integrates WizardConnect, not XO. No XO-specific bounty eligibility

@@ -46,9 +46,20 @@ export class Coordinator {
   constructor(
     public readonly store: Store,
     public readonly chain: Chain,
+    public readonly enabledNetworks: readonly Network[] = [
+      'chipnet',
+      'mainnet',
+    ],
   ) {}
 
   private mainnet(network: Network, acknowledged: boolean): void {
+    if (!this.enabledNetworks.includes(network)) {
+      throw new DomainError(
+        'NETWORK_DISABLED',
+        'Trading on this network is disabled by the server.',
+        403,
+      );
+    }
     if (network === 'mainnet' && !acknowledged) {
       throw new DomainError(
         'MAINNET_CONFIRMATION_REQUIRED',

@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
 import express, { type Request } from 'express';
 import { z } from 'zod';
 import { DomainError } from '../shared/errors.js';
@@ -59,6 +60,7 @@ export interface AppOptions {
   relayUrls?: string[];
   prizeAddress?: string;
   localDemo?: boolean;
+  trustProxyHops?: number;
 }
 
 export function createApplication(
@@ -67,6 +69,7 @@ export function createApplication(
 ) {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', options.trustProxyHops ?? false);
   const origin = options.publicOrigin
     ? new URL(options.publicOrigin).origin
     : undefined;
@@ -98,6 +101,7 @@ export function createApplication(
   app.get('/api/config', (_request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.json({
+      enabledNetworks: coordinator.enabledNetworks,
       relayUrls: options.relayUrls ?? [],
       prizeAddress: options.prizeAddress ?? '',
       mode: options.localDemo ? 'local-demo' : 'live',
@@ -126,7 +130,12 @@ export function createApplication(
     const now = coordinator.store.now();
     for (const [key, window] of windows)
       if (now - window.start >= 60_000) windows.delete(key);
-    const key = request.ip ?? request.socket.remoteAddress ?? 'unknown';
+    const forwarded = request.ip ?? request.socket.remoteAddress ?? 'unknown';
+    // Azure can include a source port; changing ports must not evade IP limits.
+    const host =
+      forwarded.match(/^\[([^\]]+)\]:\d+$/)?.[1] ??
+      forwarded.match(/^([^:]+):\d+$/)?.[1];
+    const key = host && isIP(host) ? host : forwarded;
     const window = windows.get(key) ?? { start: now, count: 0 };
     window.count += 1;
     windows.set(key, window);

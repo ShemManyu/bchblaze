@@ -15,6 +15,39 @@ interface Mutation {
 
 const mutations: Mutation[] = [
   {
+    name: 'letting Azure source-port changes evade per-IP rate limits',
+    file: 'src/server/app.ts',
+    pattern: /host && isIP\(host\) \? host : forwarded/,
+    replacement: 'forwarded',
+    testFile: 'tests/api.test.ts',
+    testName: 'trusts forwarded client addresses.*1',
+  },
+  {
+    name: 'ignoring the configured trusted proxy',
+    file: 'src/server/app.ts',
+    pattern: /app\.set\('trust proxy', options\.trustProxyHops \?\? false\);/,
+    replacement: "app.set('trust proxy', false);",
+    testFile: 'tests/api.test.ts',
+    testName: 'trusts forwarded client addresses.*1',
+  },
+  {
+    name: 'ignoring rollback-journal mode on persistent network storage',
+    file: 'src/server/store.ts',
+    pattern: /PRAGMA journal_mode=\$\{journalMode\.toUpperCase\(\)\};/,
+    replacement: 'PRAGMA journal_mode=WAL;',
+    testFile: 'tests/coordinator.test.ts',
+    testName:
+      'persists sessions, immutable proposals, and partial approvals across restart \\(delete\\)',
+  },
+  {
+    name: 'bypassing the server-side network restriction',
+    file: 'src/server/coordinator.ts',
+    pattern: /!this\.enabledNetworks\.includes\(network\)/,
+    replacement: 'false',
+    testFile: 'tests/api.test.ts',
+    testName: 'cannot enable Mainnet with a forged acknowledgement',
+  },
+  {
     name: 'missing SIGHASH_UTXOS enforcement',
     file: 'src/shared/transactions.ts',
     pattern: /script\[signatureLength\] === 0x61/,
