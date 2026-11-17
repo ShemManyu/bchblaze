@@ -208,10 +208,22 @@ az webapp start --name swapcircle-chipnet-9d5de7f7 --resource-group SwapCircle \
   --subscription 9d5de7f7-5e9e-4441-9ff9-ebe7c7030d86
 ```
 
+The first Linux dependency restore can outlast the deployment gateway and return
+HTTP 504 while Oryx continues successfully. Before retrying, inspect
+`az webapp log deployment show` with the same app, group, and subscription;
+confirm the deployment status and HTTPS health rather than blindly redeploying.
+The SCM deployment endpoint remains available while this app is stopped.
+
 Check HTTPS readiness at `/api/health`, operator restrictions at `/api/config`,
 and live Electrum connectivity at `/api/network/chipnet`. A healthy hosted app
 does not establish funded Chipnet settlement or compatibility with a released
 wallet. The public marketplace starts empty, not with synthetic demo offers.
+
+Launch verification passed in Chromium with no browser errors. The server
+rejected an acknowledged Mainnet request and a foreign-origin write. A
+SQLite-backed session survived a control-plane-confirmed app stop/start, and
+live Chipnet node connectivity recovered afterward. No funded transaction or
+demo video was produced as part of this deployment.
 
 ### Container
 
