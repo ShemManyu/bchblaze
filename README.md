@@ -107,8 +107,10 @@ honor `broadcast: false`, and use
 or altered signatures. It does not fall back to unsafe flags.
 
 Complete a funded Chipnet pilot with the exact wallet/version intended for the
-submission before using low-value Mainnet assets. No physical third-party wallet
-pilot or funded public-chain settlement has been performed for this build.
+submission before using low-value Mainnet assets. The owner reported completed
+testing and approved Mainnet activation on 2026-11-18. The automated test suite
+does not independently establish funded public-chain settlement or compatibility
+with every released wallet.
 
 ## Run a production build locally
 
@@ -156,14 +158,17 @@ requests/minute per resolved client IP. Add appropriate edge rate limiting and
 capacity planning before a public community pilot. `/api/health` proves
 coordinator readiness, not blockchain-node availability.
 
-### Azure Chipnet deployment
+### Azure deployment
 
 Public URL: <https://swapcircle-chipnet-9d5de7f7.azurewebsites.net>
 
 Resource group `SwapCircle`, East US, one Linux B1 plan
 `swapcircle-chipnet-plan`, one Node 22 LTS app, one coordinator process.
-Mainnet is disabled server-side and in the network selector. There is no separate
-paid database, container registry, or monitoring workspace.
+Chipnet and Mainnet are enabled. The existing hostname and plan names retain
+their original `chipnet` labels; both networks use the same application.
+Mainnet still requires the explicit real-funds acknowledgement and wallet
+reconnection. There is no separate paid database, container registry, or
+monitoring workspace.
 
 The verified retail B1 rate is $0.017/hour, approximately $12.41 per 730-hour
 month or $12.65 per 31-day month, before tax and separately metered usage.
@@ -174,7 +179,7 @@ paid services without revisiting this budget.
 
 Runtime settings use `HOST=0.0.0.0`, the Azure-provided `PORT`,
 `DATA_DIR=/home/swapcircle`, `SQLITE_JOURNAL_MODE=delete`,
-`ENABLED_NETWORKS=chipnet`, `TRUST_PROXY_HOPS=1`, and the exact HTTPS
+`ENABLED_NETWORKS=chipnet,mainnet`, `TRUST_PROXY_HOPS=1`, and the exact HTTPS
 `PUBLIC_ORIGIN` above. `/home/swapcircle` is persistent storage, not the
 deployment directory. Single-process exclusive database ownership is required;
 do not add instances or clustered workers. Keep `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true`.
@@ -215,15 +220,28 @@ confirm the deployment status and HTTPS health rather than blindly redeploying.
 The SCM deployment endpoint remains available while this app is stopped.
 
 Check HTTPS readiness at `/api/health`, operator restrictions at `/api/config`,
-and live Electrum connectivity at `/api/network/chipnet`. A healthy hosted app
+and live Electrum connectivity at `/api/network/chipnet` and
+`/api/network/mainnet`. A healthy hosted app
 does not establish funded Chipnet settlement or compatibility with a released
 wallet. The public marketplace starts empty, not with synthetic demo offers.
 
-Launch verification passed in Chromium with no browser errors. The server
-rejected an acknowledged Mainnet request and a foreign-origin write. A
+Initial Chipnet-only launch verification passed in Chromium with no browser
+errors. At that stage, the server rejected an acknowledged Mainnet request and
+a foreign-origin write. A
 SQLite-backed session survived a control-plane-confirmed app stop/start, and
 live Chipnet node connectivity recovered afterward. No funded transaction or
 demo video was produced as part of this deployment.
+
+On 2026-11-18, the owner confirmed testing and authorized enabling Mainnet
+alongside Chipnet. The coordinator was stopped and backed up privately outside
+the repository; archive CRC and SQLite integrity checks passed before the
+network setting changed. Mainnet activation did not add infrastructure or sign
+or broadcast any transactions. Live configuration, both node connections, and
+the Mainnet consent flow were verified. Read stored settings back with
+`az webapp config appsettings list`; the setting-write response redacts values.
+To disable new server-side Mainnet trading,
+restore `ENABLED_NETWORKS=chipnet` and restart using the same single-process
+procedure. This cannot revoke already-signed transactions.
 
 ### Container
 
